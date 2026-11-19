@@ -11,6 +11,13 @@ export function toJid(p) {
   return d.length >= 11 && d.length <= 15 ? `${d}@s.whatsapp.net` : null;
 }
 
+// הופך איש קשר מבייליז לשורה לטבלה. תומך גם במזהי lid החדשים (עם phoneNumber) ומתעלם מקבוצות/ערוצים
+export function contactRow(c) {
+  const cand = [c?.phoneNumber, c?.id].map((x) => String(x || '')).find((x) => x.endsWith('@s.whatsapp.net'));
+  if (!cand) return null;
+  return { jid: cand.replace(/:\d+@/, '@'), name: c.name || c.notify || null, updated_at: new Date().toISOString() };
+}
+
 // בונה רשימת נמענים בלי כפילויות: אנשי קשר (jid) + לקוחות (טלפון)
 export function buildAudience(clients, contacts) {
   const set = new Set();

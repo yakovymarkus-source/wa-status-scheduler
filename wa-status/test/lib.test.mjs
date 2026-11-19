@@ -112,3 +112,11 @@ test('deadline: לא מתחיל פריטים אחרי הזמן', async () => {
   await run(api, sock, rows, { deadline: Date.now() - 1 });
   assert.equal(sock.sent.length, 0); assert.equal(rows[0].status, 'pending');
 });
+
+test('contactRow: lid עם phoneNumber, קבוצות נדחות', async () => {
+  const { contactRow } = await import('../src/lib.mjs');
+  assert.equal(contactRow({ id: '123@lid', phoneNumber: '972501234567@s.whatsapp.net', name: 'א' }).jid, '972501234567@s.whatsapp.net');
+  assert.equal(contactRow({ id: '972501234567:5@s.whatsapp.net' }).jid, '972501234567@s.whatsapp.net');
+  assert.equal(contactRow({ id: '123@g.us' }), null);
+  assert.equal(contactRow({ id: '999@lid' }), null);
+});

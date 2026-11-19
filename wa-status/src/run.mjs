@@ -4,21 +4,27 @@ import pino from 'pino';
 import { useSupabaseAuthState } from './auth.mjs';
 import { api } from './api.mjs';
 import { splitVideo } from './split.mjs';
-import { sleep, buildAudience, processQueue } from './lib.mjs';
+import { sleep, buildAudience, processQueue, contactRow } from './lib.mjs';
 
 const mode = process.argv[2] || 'send';
 if (!process.env.SUPABASE_URL || !process.env.WA_API_TOKEN) { console.log('WA-SKIP: הסודות עדיין לא הוגדרו ב-GitHub'); process.exit(0); }
 const log = pino({ level: 'silent' });
+const stats = { contacts: 0 };
 
 async function connect() {
   const { state, saveCreds } = await useSupabaseAuthState();
   const { version } = await fetchLatestBaileysVersion();
   const sock = makeWASocket({ version, auth: state, logger: log, browser: Browsers.macOS('Chrome'), printQRInTerminal: false, syncFullHistory: false, markOnlineOnConnect: false });
   sock.ev.on('creds.update', saveCreds);
-  sock.ev.on('contacts.upsert', async (cs) => {
-    const rows = cs.filter((c) => c.id?.endsWith('@s.whatsapp.net')).map((c) => ({ jid: c.id, name: c.name || c.notify || null, updated_at: new Date().toISOString() }));
-    if (rows.length) await api('contacts_upsert', { rows }).catch((e) => console.log('WA-ERR contacts_upsert', e.message));
-  });
+  const saveContacts = async (cs) => {
+    const rows = (cs || []).map(contactRow).filter(Boolean);
+    if (!rows.length) return;
+    stats.contacts += rows.length;
+    await api('contacts_upsert', { rows }).catch((e) => console.log('WA-ERR contacts_upsert', e.message));
+  };
+  sock.ev.on('contacts.upsert', saveContacts);
+  sock.ev.on('contacts.update', saveContacts);
+  sock.ev.on('messaging-history.set', (h) => saveContacts(h?.contacts));
   return sock;
 }
 
@@ -81,8 +87,9 @@ async function pair() {
     throw new Error('הקוד פג או נדחה (' + (r.code || r.msg || 'timeout') + '). מריצים שוב, קוד אחד בכל הרצה כדי לא להיחסם.');
   }
   if (!opened) throw new Error('לא הצליח לחבר. להריץ שוב.');
-  console.log('מחובר. אוסף אנשי קשר 90 שניות...');
-  await sleep(90000);
+  console.log('מחובר. אוסף אנשי קשר עד 3 דקות...');
+  for (let i = 0; i < 18; i++) { await sleep(10000); if (i >= 5 && stats.contacts > 0 && stats.contacts === last) break; var last = stats.contacts; }
+  console.log('WA-STEP אנשי קשר שנשמרו:', stats.contacts);
   console.log('סיום חיבור. אפשר לסגור.');
   sock.end(undefined);
 }
