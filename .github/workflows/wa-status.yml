@@ -1,0 +1,39 @@
+name: wa-status
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'send או pair (pair = חיבור ראשון)'
+        default: 'send'
+permissions:
+  contents: read
+  actions: write
+concurrency:
+  group: wa-status
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install --no-audit --no-fund
+        working-directory: wa-status
+      - run: node src/run.mjs "$WA_MODE"
+        working-directory: wa-status
+        env:
+          WA_MODE: ${{ github.event.inputs.mode || 'send' }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          WA_API_TOKEN: ${{ secrets.WA_API_TOKEN }}
+          WA_PHONE: ${{ secrets.WA_PHONE }}
+      # מונע מ-GitHub לכבות את השעון אחרי 60 יום בלי פעילות (הפעלה מחדש של ה-workflow מאפסת את הספירה)
+      - name: keepalive
+        if: always() && github.event_name == 'schedule'
+        continue-on-error: true
+        run: gh api -X PUT "repos/$GITHUB_REPOSITORY/actions/workflows/wa-status.yml/enable"
+        env:
+          GH_TOKEN: ${{ github.token }}

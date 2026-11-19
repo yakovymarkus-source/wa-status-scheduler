@@ -1,0 +1,11 @@
+{
+  "name": "wa-status",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": { "test": "node --test" },
+  "dependencies": {
+    "@whiskeysockets/baileys": "6.7.24",
+    "pino": "^9.0.0"
+  }
+}

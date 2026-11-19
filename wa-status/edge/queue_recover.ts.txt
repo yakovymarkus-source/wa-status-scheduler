@@ -1,0 +1,10 @@
+// להוסיף ל-switch ב-wa-status-api (index.ts) לפני default. לא נפרס, מחכה לאישור.
+// בגלל concurrency של ה-workflow אין ריצה מקבילה, אז כל מה שב-sending בתחילת ריצה הוא תקוע מקריסה.
+// מסמן failed ולא pending כדי לא לשלוח כפול סטטוס שאולי כבר עלה.
+      case "queue_recover": {
+        const { data, error } = await sb.from("wa_status_queue")
+          .update({ status: "failed", error: "STUCK_SENDING: הריצה קרסה באמצע, לא נשלח שוב למניעת כפילות" })
+          .eq("status", "sending").select("id");
+        if (error) throw error;
+        return json({ recovered: (data || []).length, ids: (data || []).map((r: any) => r.id) });
+      }
